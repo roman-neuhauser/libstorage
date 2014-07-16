@@ -1,17 +1,72 @@
 
 AC_INIT(storage/StorageInterface.h)
 
-VERSION=`cat ./VERSION`
+dnl aclocal (GNU automake  1.14.1) is kinda broken
+dnl
+dnl let's have this perfectly valid autoconf code, it's supposed to
+dnl read the file called "VERSION"; macros on lines 4, 5 added to
+dnl expose quoting problems:
+dnl
+dnl   4 m4_define([VERSION], [FUBAR])
+dnl   5 m4_define([FUBAR], [SNAFU])
+dnl   6
+dnl   7 m4_define([nodot], [[\([_0-9a-zA-Z]+\)]])
+dnl   8 m4_define([reversion], [^nodot\.nodot\.nodot$])
+dnl   9 m4_define([getver], [regexp($1, reversion, $2)])
+dnl  10
+dnl  11 m4_define([readver], [getver(m4_include([$1]), [\&])])
+dnl  12
+dnl  13 m4_define([ver], readver([VERSION]))
+dnl
+dnl aclocal (run from autoreconf) gives
+dnl
+dnl   aclocal: error: configure.ac:11: file '$1' does not exist
+dnl
+dnl it apparently searches the input for m4_include (and other) calls
+dnl for some sanity checks, but at least the m4_include one needs
+dnl a sanity check itself.
+dnl
+dnl luckily, aclocal is easy to fool by quoting the macro name,
+dnl which introduces another level of macro expansion, so its arguments
+dnl need another level as well:
+dnl
+dnl  11 m4_define([readver], [getver([m4_include]([$1]), [\&])])dnl
+dnl
+dnl gives
+dnl
+dnl   /usr/bin/m4:configure.ac:13: cannot open `SNAFU': No such file or directory
+dnl
+dnl side note: interestingly (at least to my untrained eye), both
+dnl
+dnl  11 m4_define([readver], [getver(m4_include[]([$1]), [\&])])
+dnl  11 m4_define([readver], [getver(m4_include[]([[$1]]), [\&])])
+dnl
+dnl give
+dnl
+dnl   /usr/bin/m4:configure.ac:13: cannot open `': No such file or directory
 
-LIBVERSION=`cat ./LIBVERSION`
-LIBVERSION_MAJOR=`cut -d . -f 1 ./LIBVERSION`
-LIBVERSION_MINOR=`cut -d . -f 2 ./LIBVERSION`
-LIBVERSION_PATCHLEVEL=`cut -d . -f 3 ./LIBVERSION`
+m4_define([nodot], [[\([_0-9a-zA-Z]+\)]])dnl
+m4_define([reversion], [^nodot\.nodot\.nodot$])dnl
+m4_define([getver], [regexp($1, reversion, $2)])dnl
 
-LIBVERSION_CURRENT=`expr $LIBVERSION_MAJOR + $LIBVERSION_MINOR`
-LIBVERSION_REVISON=`expr $LIBVERSION_PATCHLEVEL`
-LIBVERSION_AGE=`expr $LIBVERSION_MINOR`
-LIBVERSION_INFO=$LIBVERSION_CURRENT:$LIBVERSION_REVISON:$LIBVERSION_AGE
+m4_define([readver], [getver([m4_include]([[$1]]), [\&])])dnl
+
+m4_define([ver], readver([VERSION]))dnl
+m4_define([libver], readver([LIBVERSION]))dnl
+
+m4_define([libver_major], getver(libver, [\1]))dnl
+m4_define([libver_minor], getver(libver, [\2]))dnl
+m4_define([libver_patch], getver(libver, [\3]))dnl
+
+m4_define([libver_current], m4_eval(libver_major + libver_minor))dnl
+
+VERSION="ver"
+LIBVERSION="libver"
+LIBVERSION_MAJOR="libver_major"
+LIBVERSION_MINOR="libver_minor"
+LIBVERSION_PATCHLEVEL="libver_patch"
+
+LIBVERSION_INFO=libver_current:libver_patch:libver_minor
 
 AM_INIT_AUTOMAKE(libstorage, $VERSION)
 AM_CONFIG_HEADER(config.h)
